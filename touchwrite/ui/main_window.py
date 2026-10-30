@@ -498,20 +498,18 @@ class MainWindow(QMainWindow):
     def _show_guide(self) -> None:
         QMessageBox.information(
             self,
-            "TouchWrite Finger Handwriting Guide",
-            "<h3>How to Write with One Finger on Laptop Touchpad:</h3>"
-            "<ol>"
-            "<li><b>Recommended Mode (Hold Space to Write):</b><br>"
-            "Gently hold the <b>Spacebar</b> with your left thumb or hand while gliding your right finger on the touchpad to write.<br>"
-            "Release the Spacebar when you lift your pen (to dot an 'i', cross a 't', or move to the next word).<br>"
-            "This gives 100% effortless, zero-friction handwriting without stiff physical touchpad clicks!</li><br>"
-            "<li><b>Direct Touch Mode:</b><br>"
-            "Moving your finger anywhere on the white paper automatically creates ink.</li><br>"
-            "<li><b>Auto-Lift Dwell Mode:</b><br>"
-            "Pause your finger briefly to complete each stroke.</li><br>"
-            "<li><b>Mouse / External Tablet Fallback:</b><br>"
-            "You can also draw using standard left-click drag, or connect any compatible drawing tablet or stylus!</li>"
-            "</ol>",
+            "TouchWrite Touchpad Gestures & Handwriting Guide",
+            "<h3>Touchpad Gestures & Tablet Mode:</h3>"
+            "<ul>"
+            "<li><b>👆 1 Finger (Normal Mouse):</b><br>"
+            "Move one finger across the touchpad to navigate the mouse cursor freely. Use it to select tools, pick colors, click menus, and adjust sliders without drawing accidental ink.</li><br>"
+            "<li><b>✌️ 2 Fingers (Tablet Handwriting Mode):</b><br>"
+            "Place two fingers on the touchpad and glide together to write in smooth vector ink, just like on an iPad or tablet. Lifting your fingers commits the stroke cleanly.</li><br>"
+            "<li><b>🖐 3 Fingers (Page Scrolling & Panning):</b><br>"
+            "Glide three fingers across the touchpad to scroll and pan the notebook sheet smoothly in any direction.</li><br>"
+            "<li><b>🖱 External Mouse:</b><br>"
+            "Works 100% as an ordinary mouse. Left-click drag to draw with the mouse; use the scroll wheel to scroll the page vertically.</li>"
+            "</ul>",
         )
 
     def _show_about(self) -> None:

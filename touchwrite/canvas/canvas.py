@@ -72,6 +72,7 @@ class TouchCanvas(QWidget):
         self._eraser_pos: Optional[QPointF] = None
         self._erased_in_current_drag: List[Stroke] = []
         self._erased_indices_in_drag: List[int] = []
+        self._last_three_finger_pos: Optional[QPointF] = None
 
         # History manager
         self.history = HistoryManager()
@@ -456,8 +457,18 @@ class TouchCanvas(QWidget):
         if self.is_inking and (event.buttons() & Qt.MouseButton.LeftButton):
             self.continue_stroke(canvas_pt, pressure=1.0)
 
+    def pan_by_mouse_move(self, event: QMouseEvent) -> None:
+        """Pan the canvas when 3 fingers are dragged across the touchpad."""
+        pos = event.position()
+        if self._last_three_finger_pos is not None:
+            delta = pos - self._last_three_finger_pos
+            self.pan_offset += delta
+            self.update()
+        self._last_three_finger_pos = pos
+
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         """Handle mouse release."""
+        self._last_three_finger_pos = None
         if event.button() == Qt.MouseButton.MiddleButton or (self._is_panning and self.active_tool == ToolMode.PAN):
             self._is_panning = False
             self._update_cursor()
@@ -510,20 +521,57 @@ class TouchCanvas(QWidget):
         super().focusOutEvent(event)
 
     def wheelEvent(self, event: QWheelEvent) -> None:
-        """Handle mouse wheel for zooming or scrolling."""
+        """
+        Handle mouse wheel and touchpad gestures:
+        - 2 Fingers on Touchpad: Writes ink (Tablet Mode)
+        - 3 Fingers on Touchpad: Scrolls / pans the page
+        - Physical Mouse Wheel: Scrolls the page vertically
+        - Ctrl + Wheel: Zooms the page
+        """
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             # Zoom with Ctrl + Wheel
             delta = event.angleDelta().y()
             factor = 1.15 if delta > 0 else 0.85
             self.set_zoom(self.zoom * factor, anchor_screen=event.position())
             event.accept()
-        else:
-            # Pan with scroll
+            return
+
+        is_touchpad_gesture = (event.source() == Qt.MouseEventSource.MouseEventSynthesizedBySystem) or (not event.pixelDelta().isNull())
+        is_three_finger = False
+        if self.input_manager and hasattr(self.input_manager, 'win_pointer_adapter'):
+            is_three_finger = (self.input_manager.win_pointer_adapter.contact_count >= 3) or self.input_manager.win_pointer_adapter.is_three_finger_scrolling
+
+        # If 3 fingers on touchpad, or physical mouse wheel, or in Pan tool, or tablet mode OFF: SCROLL / PAN THE PAGE!
+        if is_three_finger or not is_touchpad_gesture or self.active_tool == ToolMode.PAN or not self.config.tablet_touchpad_mode:
             dx = event.pixelDelta().x() if not event.pixelDelta().isNull() else event.angleDelta().x() / 2.0
             dy = event.pixelDelta().y() if not event.pixelDelta().isNull() else event.angleDelta().y() / 2.0
             self.pan_offset += QPointF(dx, dy)
             self.update()
             event.accept()
+            return
+
+        # Otherwise: 2 Fingers on Touchpad -> TABLET INKING MODE!
+        if self.active_tool == ToolMode.PEN:
+            pos = event.position()
+            canvas_pt = self.screen_to_canvas(pos)
+            if self.get_paper_rect().contains(canvas_pt):
+                phase = event.phase()
+                if phase == Qt.ScrollPhase.ScrollBegin or not self.is_inking:
+                    self.start_stroke(canvas_pt, pressure=1.0)
+                else:
+                    self.continue_stroke(canvas_pt, pressure=1.0)
+
+                # Restart dwell timer so lifting fingers commits the stroke in 50ms
+                if self.input_manager and hasattr(self.input_manager, 'touchpad_adapter'):
+                    self.input_manager.touchpad_adapter.dwell_timer.start(50)
+
+                if phase == Qt.ScrollPhase.ScrollEnd:
+                    self.end_stroke()
+
+                event.accept()
+                return
+
+        event.accept()
 
     def leaveEvent(self, event) -> None:
         """Hide eraser cursor and commit stroke if leaving paper."""

@@ -40,6 +40,7 @@ NID_READY            = 0x80
 
 user32 = ctypes.windll.user32 if sys.platform == "win32" else None
 kernel32 = ctypes.windll.kernel32 if sys.platform == "win32" else None
+hid = ctypes.windll.hid if sys.platform == "win32" else None
 
 
 class RAWINPUTHEADER(ctypes.Structure):
@@ -103,6 +104,22 @@ if user32 is not None:
     except Exception:
         pass
 
+if hid is not None:
+    try:
+        hid.HidP_GetUsageValue.argtypes = [
+            ctypes.c_int,
+            wintypes.USHORT,
+            wintypes.USHORT,
+            wintypes.USHORT,
+            ctypes.POINTER(wintypes.ULONG),
+            wintypes.LPVOID,
+            wintypes.LPSTR,
+            wintypes.ULONG,
+        ]
+        hid.HidP_GetUsageValue.restype = wintypes.LONG
+    except Exception:
+        pass
+
 
 class RawInputEventFilter(QAbstractNativeEventFilter):
     """
@@ -150,6 +167,13 @@ class WinPointerAdapter(BaseInputAdapter):
         self.last_touchpad_time: float = 0.0
         self.last_mouse_time: float = 0.0
 
+        # Multi-touch contact telemetry for 2-finger inking and 3-finger scrolling
+        self.preparsed_data: Optional[ctypes.c_char_p] = None
+        self.contact_count: int = 1
+        self.last_contact_time: float = 0.0
+        self.is_two_finger_writing: bool = False
+        self.is_three_finger_scrolling: bool = False
+
         # Global native event filter
         self.event_filter: Optional[RawInputEventFilter] = None
         self._filter_installed: bool = False
@@ -184,6 +208,16 @@ class WinPointerAdapter(BaseInputAdapter):
                 is_tp = any(k in name for k in ("gxtp", "touchpad", "col01", "col02", "col03", "col04", "synaptics", "elan"))
                 if is_tp:
                     self.device_map[h] = "TOUCHPAD"
+                    if d.dwType == 2 and self.preparsed_data is None:
+                        try:
+                            sz_pre = wintypes.UINT(0)
+                            user32.GetRawInputDeviceInfoW(h, 0x20000005, None, ctypes.byref(sz_pre))
+                            if sz_pre.value > 0:
+                                buf_pre = ctypes.create_string_buffer(sz_pre.value)
+                                user32.GetRawInputDeviceInfoW(h, 0x20000005, buf_pre, ctypes.byref(sz_pre))
+                                self.preparsed_data = buf_pre
+                        except Exception:
+                            pass
                 elif d.dwType == 0:  # RIM_TYPEMOUSE
                     self.device_map[h] = "MOUSE"
         except Exception:
@@ -287,13 +321,44 @@ class WinPointerAdapter(BaseInputAdapter):
                 res = user32.GetRawInputData(hRawInput, RID_INPUT, buf, ctypes.byref(dwSize), ctypes.sizeof(RAWINPUTHEADER))
                 if res != 0xFFFFFFFF:
                     hdr = RAWINPUTHEADER.from_buffer_copy(buf[:ctypes.sizeof(RAWINPUTHEADER)])
-                    src = self.identify_device(hdr.hDevice)
                     now = time.time()
-                    self.last_source = src
-                    if src == "TOUCHPAD":
+
+                    # Type 2: HID Digitizer Report (Touchpad Collection GXTP5100&Col02)
+                    if hdr.dwType == 2:
+                        self.last_source = "TOUCHPAD"
                         self.last_touchpad_time = now
-                    else:
-                        self.last_mouse_time = now
+                        if self.preparsed_data and dwSize.value > 32 and hid is not None:
+                            try:
+                                dwSizeHid = wintypes.DWORD.from_buffer_copy(buf[24:28]).value
+                                dwCount = wintypes.DWORD.from_buffer_copy(buf[28:32]).value
+                                total_bytes = dwSizeHid * dwCount
+                                raw_report = buf[32 : 32 + total_bytes]
+                                val = wintypes.ULONG(0)
+                                hid_res = hid.HidP_GetUsageValue(
+                                    0, 0x000D, 0, 0x0054, ctypes.byref(val),
+                                    self.preparsed_data, raw_report, len(raw_report)
+                                )
+                                if hid_res == 0x110000:
+                                    self.contact_count = val.value
+                                    self.last_contact_time = now
+                                    self.is_two_finger_writing = (val.value == 2)
+                                    self.is_three_finger_scrolling = (val.value >= 3)
+                            except Exception:
+                                pass
+
+                    # Type 0: Mouse Pointer Report
+                    elif hdr.dwType == 0:
+                        src = self.identify_device(hdr.hDevice)
+                        self.last_source = src
+                        if src == "TOUCHPAD":
+                            self.last_touchpad_time = now
+                            if now - self.last_contact_time > 0.08:
+                                # When not actively multi-touch, 1-finger mouse navigation is active
+                                self.contact_count = 1
+                                self.is_two_finger_writing = False
+                                self.is_three_finger_scrolling = False
+                        else:
+                            self.last_mouse_time = now
         except Exception:
             pass
 

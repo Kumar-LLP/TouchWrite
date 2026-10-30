@@ -53,7 +53,7 @@ def test_hold_to_write_keyboard_trigger():
     assert mgr.touchpad_adapter.is_trigger_held is False
 
 
-def test_single_finger_tablet_mode():
+def test_two_finger_tablet_mode():
     config = AppConfig(input_mode=InputMode.TABLET_TOUCHPAD, tablet_touchpad_mode=True, finger_lift_timeout_ms=50)
     canvas = TouchCanvas(config)
     mgr = InputManager(config)
@@ -62,12 +62,13 @@ def test_single_finger_tablet_mode():
     assert mgr.config.tablet_touchpad_mode is True
     assert "Tablet" in mgr.get_active_device_label()
 
-    # Mark hardware source as Touchpad
+    # Mark hardware source as Touchpad with 2 fingers contacting!
     import time
     mgr.win_pointer_adapter.last_source = "TOUCHPAD"
     mgr.win_pointer_adapter.last_touchpad_time = time.time()
+    mgr.win_pointer_adapter.contact_count = 2
 
-    # Move finger inside paper -> should start and continue stroke without spacebar!
+    # Move 2 fingers inside paper -> should start and continue stroke!
     from PySide6.QtGui import QMouseEvent
     pt1 = QPointF(200, 200)
     move1 = QMouseEvent(QMouseEvent.Type.MouseMove, pt1, pt1, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
@@ -86,6 +87,58 @@ def test_single_finger_tablet_mode():
     mgr.touchpad_adapter._on_dwell_timeout()
     assert canvas.is_inking is False
     assert len(canvas.strokes) == 1
+
+
+def test_one_finger_normal_mouse_mode():
+    config = AppConfig(input_mode=InputMode.TABLET_TOUCHPAD, tablet_touchpad_mode=True)
+    canvas = TouchCanvas(config)
+    mgr = InputManager(config)
+    mgr.attach_canvas(canvas)
+
+    import time
+    from PySide6.QtGui import QMouseEvent
+
+    # 1 finger on touchpad
+    mgr.win_pointer_adapter.last_source = "TOUCHPAD"
+    mgr.win_pointer_adapter.last_touchpad_time = time.time()
+    mgr.win_pointer_adapter.contact_count = 1
+
+    # Moving 1 finger hovering MUST NOT ink (acts as normal mouse pointer)
+    pt = QPointF(250, 250)
+    move_one = QMouseEvent(QMouseEvent.Type.MouseMove, pt, pt, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
+    handled = mgr.dispatch_mouse_move(move_one)
+    assert handled is False
+    assert canvas.is_inking is False
+    assert len(canvas.strokes) == 0
+
+
+def test_three_finger_page_scrolling():
+    config = AppConfig(input_mode=InputMode.TABLET_TOUCHPAD, tablet_touchpad_mode=True)
+    canvas = TouchCanvas(config)
+    mgr = InputManager(config)
+    mgr.attach_canvas(canvas)
+
+    import time
+    from PySide6.QtGui import QMouseEvent
+
+    # 3 fingers on touchpad
+    mgr.win_pointer_adapter.last_source = "TOUCHPAD"
+    mgr.win_pointer_adapter.last_touchpad_time = time.time()
+    mgr.win_pointer_adapter.contact_count = 3
+
+    init_pan = QPointF(canvas.pan_offset.x(), canvas.pan_offset.y())
+
+    # Moving 3 fingers pans/scrolls the canvas
+    pt1 = QPointF(200, 200)
+    move1 = QMouseEvent(QMouseEvent.Type.MouseMove, pt1, pt1, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
+    mgr.dispatch_mouse_move(move1)
+
+    pt2 = QPointF(210, 230)
+    move2 = QMouseEvent(QMouseEvent.Type.MouseMove, pt2, pt2, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
+    mgr.dispatch_mouse_move(move2)
+
+    assert canvas.is_inking is False
+    assert canvas.pan_offset != init_pan
 
 
 def test_external_mouse_does_not_draw_by_hovering_in_tablet_mode():
@@ -140,9 +193,14 @@ def test_tablet_mode_jump_detection_separates_strokes():
     mgr = InputManager(config)
     mgr.attach_canvas(canvas)
 
+    import time
     from PySide6.QtGui import QMouseEvent
 
-    # Stroke 1: Draw letter "C"
+    mgr.win_pointer_adapter.last_source = "TOUCHPAD"
+    mgr.win_pointer_adapter.last_touchpad_time = time.time()
+    mgr.win_pointer_adapter.contact_count = 2
+
+    # Stroke 1: Draw letter "C" with 2 fingers
     pt1 = QPointF(200, 200)
     move1 = QMouseEvent(QMouseEvent.Type.MouseMove, pt1, pt1, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
     mgr.dispatch_mouse_move(move1)
@@ -153,7 +211,7 @@ def test_tablet_mode_jump_detection_separates_strokes():
     assert len(canvas.strokes) == 0
     assert canvas.is_inking is True
 
-    # Finger lifts and touches down to start "h" 80 pixels away
+    # Fingers lift and touch down to start "h" 80 pixels away
     # Jump detection must commit stroke 1 and start stroke 2 without an unwanted connecting line!
     pt3 = QPointF(290, 200)
     move3 = QMouseEvent(QMouseEvent.Type.MouseMove, pt3, pt3, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
@@ -165,6 +223,38 @@ def test_tablet_mode_jump_detection_separates_strokes():
     mgr.touchpad_adapter._on_dwell_timeout()
     assert len(canvas.strokes) == 2
     assert canvas.is_inking is False
+
+
+def test_two_finger_wheel_event_inks_and_three_finger_scrolls():
+    from PySide6.QtGui import QWheelEvent
+    from PySide6.QtCore import QPoint
+
+    config = AppConfig(input_mode=InputMode.TABLET_TOUCHPAD, tablet_touchpad_mode=True)
+    canvas = TouchCanvas(config)
+    mgr = InputManager(config)
+    mgr.attach_canvas(canvas)
+
+    # 1. Two-finger gesture event (source == SynthesizedBySystem, non-zero pixelDelta) -> INKS!
+    mgr.win_pointer_adapter.contact_count = 2
+    pt = QPointF(200, 200)
+    wheel_2f = QWheelEvent(
+        pt, pt, QPoint(0, 5), QPoint(0, 60),
+        Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+        Qt.ScrollPhase.ScrollUpdate, False, Qt.MouseEventSource.MouseEventSynthesizedBySystem
+    )
+    canvas.wheelEvent(wheel_2f)
+    assert canvas.is_inking is True
+
+    # 2. Three-finger gesture event (contact_count == 3) -> SCROLLS/PANS THE PAGE!
+    mgr.win_pointer_adapter.contact_count = 3
+    init_pan = QPointF(canvas.pan_offset.x(), canvas.pan_offset.y())
+    wheel_3f = QWheelEvent(
+        pt, pt, QPoint(10, 20), QPoint(0, 120),
+        Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+        Qt.ScrollPhase.ScrollUpdate, False, Qt.MouseEventSource.MouseEventSynthesizedBySystem
+    )
+    canvas.wheelEvent(wheel_3f)
+    assert canvas.pan_offset != init_pan
 
 
 def test_device_discrimination_telemetry():
