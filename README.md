@@ -3,12 +3,12 @@
 # ✍️ TouchWrite
 
 **Transform your Windows laptop touchpad into a natural digital writing tablet.**  
-*1 Finger moves the mouse cursor • 2 Fingers write natural vector ink • 3 Fingers scroll and pan the notebook page.*
+*Write seamlessly with one finger in real time — no stylus, no extra hardware, and no font conversion.*
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/Framework-PySide6%20(Qt6)-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://pypi.org/project/PySide6/)
 [![OS](https://img.shields.io/badge/Platform-Windows%2011%20%7C%2010-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
-[![Tests](https://img.shields.io/badge/Tests-32%20Passed-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Kumar-LLP/TouchWrite)
+[![Tests](https://img.shields.io/badge/Tests-29%20Passed-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](https://github.com/Kumar-LLP/TouchWrite)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 [Features](#-key-features) • [How It Works](#-how-it-works) • [Installation](#-quick-start) • [Shortcuts](#-keyboard-shortcuts) • [Architecture](#-architecture) • [Testing](#-running-tests)
@@ -21,24 +21,19 @@
 
 Have you ever wanted to jot down handwritten mathematical formulas, sign a PDF, draw diagrams, or take natural notebook notes on your Windows laptop without buying an expensive graphics tablet or touchscreen convertible?
 
-Standard laptop touchpads are tuned only for cursor pointing. If an application attempts to draw on simple finger movement, it either creates endless accidental lines or interferes with normal mouse navigation.
+Standard laptop touchpads are tuned only for cursor pointing. If an application attempts to draw on mouse movement, it either creates endless connected lines or requires stiff, uncomfortable physical clicks. 
 
-**TouchWrite solves this with a clean, gesture-driven multi-touch workflow:**
-- 👆 **1 Finger on Touchpad**: Normal mouse cursor! (Point, hover, click toolbar buttons, select swatches, and navigate menus without inking).
-- ✌️ **2 Fingers on Touchpad**: Tablet Writing Mode! (Glide two fingers together to write words, letters, and mathematics directly on the notebook).
-- 🖐 **3 Fingers on Touchpad**: Page Scrolling & Panning! (Glide three fingers across the touchpad to scroll the page in any direction).
-- 🖱 **External Mouse**: Operates 100% as an ordinary mouse. Left-click drag to draw; scroll wheel to scroll vertically.
+**TouchWrite solves this fundamental engineering challenge.** Using low-level Windows Precision Touchpad (PTP) telemetry and intelligent stroke discrimination, TouchWrite turns your built-in laptop touchpad into an authentic, responsive writing surface — write with **one finger** just like writing with a pen on an iPad!
 
 ---
 
 ## ✨ Key Features
 
-### ✌️ Intuitive Gesture System
-- **1 Finger Normal Mouse**: Move your cursor freely over the canvas, menu bar, and toolbar without drawing accidental ink.
-- **2 Finger Tablet Inking**: Gliding two fingers across the touchpad activates direct vector inking with zero friction.
-- **3 Finger Page Scrolling**: Three fingers simultaneously scrolls and pans the notebook sheet up, down, left, and right.
-- **Fast Auto-Lift Timing (50 ms)**: Lifting your fingers commits the stroke cleanly without connecting streaks.
-- **Spatial Jump Detection**: Crossing a `t`, dotting an `i`, or starting a new letter automatically breaks the stroke cleanly.
+### 📱 True Single-Finger Tablet Mode
+- **Effortless Inking**: Glide your index finger naturally across the touchpad surface to write letters, words, and sentences in real time.
+- **External Mouse Isolation**: Connect an external USB/Bluetooth mouse simultaneously! While your touchpad acts as the writing surface, your external mouse acts 100% as an ordinary mouse pointer — click color swatches, change pen widths, select tools, and navigate menus without producing stray marks.
+- **Fast Auto-Lift Timing (50 ms)**: When you lift your finger to move to the next word, the stroke commits instantly.
+- **Spatial Jump Detection**: Crossing a `t`, dotting an `i`, or starting a new letter automatically breaks the stroke without drawing unwanted connecting lines across your writing.
 
 ### 🖋 Natural Handwriting Engine
 - **Midpoint Quadratic Bézier Splines**: Raw coordinate points are smoothly interpolated into organic, mathematically continuous vector curves.
@@ -209,17 +204,17 @@ Output:
 ```text
 ============================= test session starts =============================
 platform win32 -- Python 3.14.5, pytest-9.2.0, pluggy-1.7.0
-collected 32 items
+collected 29 items
 
-tests/test_canvas.py ......                                              [ 18%]
-tests/test_chatgpt_workflow.py .                                         [ 21%]
-tests/test_export.py ...                                                 [ 31%]
-tests/test_input.py ...........                                          [ 65%]
-tests/test_storage.py ....                                               [ 78%]
+tests/test_canvas.py ......                                              [ 20%]
+tests/test_chatgpt_workflow.py .                                         [ 24%]
+tests/test_export.py ...                                                 [ 34%]
+tests/test_input.py ........                                             [ 62%]
+tests/test_storage.py ....                                               [ 75%]
 tests/test_stroke.py .....                                               [ 93%]
 tests/test_ui_and_paper.py ..                                            [100%]
 
-============================== 32 passed in 1.01s =============================
+============================== 29 passed in 1.00s =============================
 ```
 
 ---

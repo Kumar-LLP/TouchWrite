@@ -103,18 +103,12 @@ class TouchWriteToolBar(QToolBar):
         self._build_ui()
 
     def _build_ui(self) -> None:
-        # 0. Primary 2-Finger Tablet Mode Button (Prominent toggle)
+        # 0. Primary Single-Finger Tablet Mode Button (Prominent toggle)
         self.btn_tablet_mode = QToolButton()
         self.btn_tablet_mode.setCheckable(True)
         self.btn_tablet_mode.setChecked(self.config.tablet_touchpad_mode)
         self._update_tablet_button_text()
-        self.btn_tablet_mode.setToolTip(
-            "Toggle 2-Finger Tablet Mode (T)\n"
-            "• 1 Finger: Normal Mouse Pointer\n"
-            "• 2 Fingers: Write in Ink (Tablet Mode)\n"
-            "• 3 Fingers: Scroll / Pan Page\n"
-            "• External Mouse: Normal Mouse"
-        )
+        self.btn_tablet_mode.setToolTip("Toggle Single-Finger Tablet Mode (T)\nON: Glide 1 finger on touchpad to write like a tablet\nOFF: Touchpad acts as standard cursor")
         self.btn_tablet_mode.clicked.connect(self._on_tablet_btn_clicked)
         self.addWidget(self.btn_tablet_mode)
 
@@ -283,12 +277,12 @@ class TouchWriteToolBar(QToolBar):
 
     def _update_tablet_button_text(self) -> None:
         if self.config.tablet_touchpad_mode:
-            self.btn_tablet_mode.setText("✌️ 2-Finger Tablet: ON")
+            self.btn_tablet_mode.setText("📱 Tablet Mode: ON")
             self.btn_tablet_mode.setStyleSheet(
                 "background-color: #2563EB; color: #FFFFFF; font-weight: bold; border-radius: 6px; padding: 5px 10px;"
             )
         else:
-            self.btn_tablet_mode.setText("✌️ 2-Finger Tablet: OFF")
+            self.btn_tablet_mode.setText("📱 Tablet Mode: OFF")
             self.btn_tablet_mode.setStyleSheet(
                 "background-color: #E5E7EB; color: #4B5563; font-weight: 500; border-radius: 6px; padding: 5px 10px;"
             )

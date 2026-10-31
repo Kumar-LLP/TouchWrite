@@ -78,7 +78,7 @@ class InputManager(QObject):
         """User-friendly label for current device."""
         if self.active_adapter == self.touchpad_adapter:
             if self.config.tablet_touchpad_mode:
-                return "2-Finger Tablet (Touchpad)"
+                return "Single-Finger Tablet (Touchpad)"
             return "Precision Touchpad"
         elif self.active_adapter == self.mouse_adapter:
             return "Mouse Fallback"
@@ -89,14 +89,14 @@ class InputManager(QObject):
     def get_active_mode_label(self) -> str:
         """User-friendly label for current writing mode."""
         labels = {
-            InputMode.TABLET_TOUCHPAD: "2-Finger Tablet Writing",
+            InputMode.TABLET_TOUCHPAD: "Single-Finger Tablet Mode",
             InputMode.HOLD_TO_WRITE: "Hold Space to Write",
             InputMode.DIRECT_CONTACT: "Direct Touch Inking",
             InputMode.AUTO_DWELL: "Auto-Lift Dwell",
             InputMode.CLICK_AND_DRAG: "Click / Tap to Write",
             InputMode.PEN_TABLET: "Direct Tablet Ink",
         }
-        return labels.get(self.config.input_mode, "2-Finger Tablet Writing")
+        return labels.get(self.config.input_mode, "Single-Finger Tablet Mode")
 
     def toggle_tablet_mode(self, enabled: Optional[bool] = None) -> bool:
         """Toggle or set dedicated single-finger tablet writing mode."""
@@ -131,53 +131,28 @@ class InputManager(QObject):
         if self.config.tablet_touchpad_mode or self.config.input_mode == InputMode.TABLET_TOUCHPAD:
             if self.is_external_mouse_active():
                 return self.mouse_adapter.handle_mouse_press(event)
-            contact_cnt = self.win_pointer_adapter.contact_count
-            if contact_cnt == 2 or self.win_pointer_adapter.is_two_finger_writing:
-                return self.touchpad_adapter.handle_mouse_press(event)
-            # 1 finger: acts as standard mouse click
-            return self.mouse_adapter.handle_mouse_press(event)
+            return self.touchpad_adapter.handle_mouse_press(event)
         return self.active_adapter.handle_mouse_press(event)
 
     def dispatch_mouse_move(self, event) -> bool:
-        # 1. External Mouse: Acts 100% as a normal mouse!
-        if self.is_external_mouse_active():
-            if self.touchpad_adapter.is_writing and self.touchpad_adapter.canvas:
-                self.touchpad_adapter.canvas.end_stroke()
-                self.touchpad_adapter.is_writing = False
-
-            if event.buttons() & Qt.MouseButton.LeftButton:
-                return self.mouse_adapter.handle_mouse_move(event)
-            return False
-
-        # 2. Touchpad: 1 finger = normal mouse; 2 fingers = tablet inking; 3 fingers = page scrolling
+        # If in Tablet Mode: Touchpad writes like a tablet, External Mouse acts like normal mouse!
         if self.config.tablet_touchpad_mode or self.config.input_mode == InputMode.TABLET_TOUCHPAD:
-            contact_cnt = self.win_pointer_adapter.contact_count
-
-            # 3 Fingers -> SCROLL / PAN THE PAGE!
-            if contact_cnt >= 3:
+            if self.is_external_mouse_active():
+                # External mouse moving: Do NOT draw ink when just hovering!
+                # If a previous touchpad stroke was active, commit it so mouse doesn't drag ink:
                 if self.touchpad_adapter.is_writing and self.touchpad_adapter.canvas:
                     self.touchpad_adapter.canvas.end_stroke()
                     self.touchpad_adapter.is_writing = False
-                if self.touchpad_adapter.canvas:
-                    self.touchpad_adapter.canvas.pan_by_mouse_move(event)
-                return True
 
-            # 2 Fingers -> TABLET WRITING MODE (INKS ON CANVAS)!
-            if contact_cnt == 2 or self.win_pointer_adapter.is_two_finger_writing:
-                return self.touchpad_adapter.handle_mouse_move(event)
+                # If user is explicitly holding left-click on the mouse, allow mouse drawing:
+                if event.buttons() & Qt.MouseButton.LeftButton:
+                    return self.mouse_adapter.handle_mouse_move(event)
 
-            # 1 Finger -> NORMAL MOUSE POINTER!
-            # With one finger, it works like a normal mouse (hovering cursor, no inking)!
-            if self.touchpad_adapter.is_writing and self.touchpad_adapter.canvas:
-                self.touchpad_adapter.canvas.end_stroke()
-                self.touchpad_adapter.is_writing = False
+                # Mouse hover/pointer navigation: DO NOT DRAW!
+                return False
 
-            if event.buttons() & Qt.MouseButton.LeftButton:
-                # If user explicitly clicks/taps-and-drags, allow drawing
-                return self.mouse_adapter.handle_mouse_move(event)
-
-            # 1 Finger cursor movement: free normal pointer navigation!
-            return False
+            # Touchpad movement: write directly like a tablet with one finger!
+            return self.touchpad_adapter.handle_mouse_move(event)
 
         return self.active_adapter.handle_mouse_move(event)
 
@@ -185,10 +160,7 @@ class InputManager(QObject):
         if self.config.tablet_touchpad_mode or self.config.input_mode == InputMode.TABLET_TOUCHPAD:
             if self.is_external_mouse_active():
                 return self.mouse_adapter.handle_mouse_release(event)
-            contact_cnt = self.win_pointer_adapter.contact_count
-            if contact_cnt == 2 or self.win_pointer_adapter.is_two_finger_writing:
-                return self.touchpad_adapter.handle_mouse_release(event)
-            return self.mouse_adapter.handle_mouse_release(event)
+            return self.touchpad_adapter.handle_mouse_release(event)
         return self.active_adapter.handle_mouse_release(event)
 
     def dispatch_tablet_event(self, event) -> bool:
