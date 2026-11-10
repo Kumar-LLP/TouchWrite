@@ -1,5 +1,6 @@
 <div align="center">
-(Not Completed still working on it )
+**(Not Completed still working on it )**
+    
 # ✍️ TouchWrite
 
 **Transform your Windows laptop touchpad into a natural digital writing tablet.**  
